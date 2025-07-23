@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "basic-homelab-project",
+    "description": "A basic homelab project with minimal configuration",
+    "type": "generic",
+    "language": "javascript",
+    "author": "Your Name <your.email@example.com>",
+    "license": "MIT"
+  },
+  "mcp": {
+    "servers": "minimal",
+    "configuration": {
+      "filesystem": {
+        "enabled": true,
+        "allowedDirectories": [".", "./src", "./docs", "./scripts"]
+      },
+      "github": {
+        "enabled": true,
+        "defaultOrg": ""
+      },
+      "homeAssistant": {
+        "enabled": false
+      },
+      "networkFs": {
+        "enabled": false
+      },
+      "directoryPolling": {
+        "enabled": false
+      }
+    }
+  },
+  "github": {
+    "useTemplates": true,
+    "workflowSync": false,
+    "issueTemplates": false,
+    "prTemplates": false
+  },
+  "structure": {
+    "api": {
+      "enabled": false
+    },
+    "dashboard": {
+      "enabled": false
+    },
+    "documentation": {
+      "enabled": true,
+      "format": "markdown"
+    },
+    "scripts": {
+      "enabled": true,
+      "shell": "bash"
+    }
+  },
+  "features": {
+    "linting": false,
+    "testing": false,
+    "cicd": false,
+    "docker": false,
+    "monitoring": false
+  }
+}

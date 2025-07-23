@@ -1,0 +1,76 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "netbox-agent",
+    "description": "An agent for populating a NetBox server with data from various sources using MCP servers",
+    "type": "automation",
+    "language": "python",
+    "author": "dev",
+    "license": "MIT"
+  },
+  "mcp": {
+    "servers": "all",
+    "customPaths": {},
+    "configuration": {
+      "filesystem": {
+        "enabled": true,
+        "allowedDirectories": [".", "./src", "./docs", "./scripts", "./config", "./logs"]
+      },
+      "github": {
+        "enabled": true,
+        "defaultOrg": "festion"
+      },
+      "homeAssistant": {
+        "enabled": true,
+        "apiUrl": "http://192.168.1.10:8123",
+        "tokenPath": "/config/ha_token"
+      },
+      "networkFs": {
+        "enabled": true,
+        "shares": {
+          "truenas": {
+            "path": "/mnt/truenas",
+            "type": "nfs"
+          }
+        }
+      },
+      "directoryPolling": {
+        "enabled": true,
+        "watchDirectories": ["./config", "./logs"]
+      }
+    }
+  },
+  "github": {
+    "useTemplates": true,
+    "workflowSync": true,
+    "issueTemplates": true,
+    "prTemplates": true
+  },
+  "structure": {
+    "api": {
+      "enabled": false,
+      "framework": "fastapi",
+      "language": "python"
+    },
+    "dashboard": {
+      "enabled": false,
+      "framework": "streamlit",
+      "language": "python"
+    },
+    "documentation": {
+      "enabled": true,
+      "format": "markdown"
+    },
+    "scripts": {
+      "enabled": true,
+      "shell": "bash"
+    }
+  },
+  "features": {
+    "linting": true,
+    "testing": true,
+    "cicd": true,
+    "docker": true,
+    "monitoring": true
+  }
+}

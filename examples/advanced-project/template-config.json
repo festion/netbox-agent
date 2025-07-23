@@ -1,0 +1,183 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "advanced-homelab-project",
+    "description": "An advanced homelab project with full features",
+    "type": "fullstack",
+    "language": "javascript",
+    "author": "Your Name <your.email@example.com>",
+    "license": "MIT"
+  },
+  "mcp": {
+    "servers": "all",
+    "configuration": {
+      "filesystem": {
+        "enabled": true,
+        "allowedDirectories": [".", "./src", "./docs", "./scripts", "./api", "./dashboard"]
+      },
+      "github": {
+        "enabled": true,
+        "defaultOrg": "your-github-org"
+      },
+      "homeAssistant": {
+        "enabled": true,
+        "apiUrl": "http://homeassistant.local:8123",
+        "tokenPath": "/config/secrets/ha-token"
+      },
+      "networkFs": {
+        "enabled": true,
+        "shares": {
+          "nas": {
+            "host": "nas.local",
+            "path": "/share/data",
+            "credentials": {
+              "username": "homelab",
+              "passwordPath": "/config/secrets/nas-password"
+            }
+          }
+        }
+      },
+      "directoryPolling": {
+        "enabled": true,
+        "watchDirectories": [
+          {
+            "path": "./src",
+            "patterns": ["*.js", "*.ts", "*.jsx", "*.tsx"],
+            "recursive": true
+          },
+          {
+            "path": "./api",
+            "patterns": ["*.js", "*.json"],
+            "recursive": true
+          }
+        ]
+      }
+    }
+  },
+  "github": {
+    "useTemplates": true,
+    "workflowSync": true,
+    "issueTemplates": true,
+    "prTemplates": true,
+    "workflows": {
+      "ci": {
+        "enabled": true,
+        "nodeVersions": ["16", "18", "20"],
+        "testCommand": "npm test",
+        "lintCommand": "npm run lint"
+      },
+      "cd": {
+        "enabled": true,
+        "deployBranch": "main",
+        "deploymentTarget": "production"
+      },
+      "security": {
+        "enabled": true,
+        "dependabot": true,
+        "codeql": true
+      }
+    }
+  },
+  "structure": {
+    "api": {
+      "enabled": true,
+      "framework": "express",
+      "language": "javascript",
+      "features": {
+        "authentication": true,
+        "logging": true,
+        "validation": true,
+        "swagger": true
+      },
+      "database": {
+        "type": "postgresql",
+        "orm": "prisma"
+      }
+    },
+    "dashboard": {
+      "enabled": true,
+      "framework": "react",
+      "language": "javascript",
+      "features": {
+        "routing": "react-router",
+        "stateManagement": "redux",
+        "uiLibrary": "material-ui",
+        "charts": "recharts"
+      },
+      "buildTool": "vite"
+    },
+    "documentation": {
+      "enabled": true,
+      "format": "markdown",
+      "api": {
+        "enabled": true,
+        "generator": "swagger",
+        "outputPath": "docs/api"
+      },
+      "architecture": {
+        "enabled": true,
+        "diagrams": true,
+        "format": "mermaid"
+      }
+    },
+    "scripts": {
+      "enabled": true,
+      "shell": "bash"
+    }
+  },
+  "features": {
+    "linting": {
+      "enabled": true,
+      "tools": ["eslint", "prettier"],
+      "rules": "standard"
+    },
+    "testing": {
+      "enabled": true,
+      "framework": "jest",
+      "coverage": true,
+      "e2e": "playwright"
+    },
+    "typescript": {
+      "enabled": false,
+      "strict": true
+    },
+    "cicd": {
+      "enabled": true,
+      "platform": "github-actions"
+    },
+    "docker": {
+      "enabled": true,
+      "multiStage": true,
+      "baseImage": "node:18-alpine"
+    },
+    "monitoring": {
+      "enabled": true,
+      "metrics": "prometheus",
+      "logging": "winston",
+      "tracing": "jaeger"
+    },
+    "security": {
+      "enabled": true,
+      "secrets": "vault",
+      "scanning": "snyk"
+    }
+  },
+  "environments": {
+    "development": {
+      "nodeEnv": "development",
+      "debug": true,
+      "hotReload": true
+    },
+    "staging": {
+      "nodeEnv": "staging",
+      "debug": false,
+      "ssl": true
+    },
+    "production": {
+      "nodeEnv": "production",
+      "debug": false,
+      "ssl": true,
+      "monitoring": true
+    }
+  }
+}
