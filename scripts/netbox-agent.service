@@ -1,0 +1,31 @@
+[Unit]
+Description=NetBox Agent - Automated NetBox Population Service
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=netboxagent
+Group=netboxagent
+WorkingDirectory=/opt/netbox-agent
+Environment=PYTHONPATH=/opt/netbox-agent
+ExecStart=/opt/netbox-agent/venv/bin/python src/netbox_agent.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/netbox-agent/logs /opt/netbox-agent/cache
+PrivateTmp=true
+
+# Resource limits
+MemoryLimit=1G
+
+[Install]
+WantedBy=multi-user.target

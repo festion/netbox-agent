@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  netbox-agent:
+    build: .
+    container_name: netbox-agent
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=INFO
+    env_file:
+      - .env
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+      - agent-cache:/app/cache
+    healthcheck:
+      test: ["CMD", "python", "scripts/health_check.py"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  agent-cache:
