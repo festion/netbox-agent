@@ -1,10 +1,10 @@
 {
   "netbox": {
-    "url": "https://netbox.example.com",
-    "token": "your-netbox-api-token",
-    "verify_ssl": true
+    "url": "http://192.168.1.138",
+    "token": "60f3fd1bff8178cc53dea8b86f624231d41b2415",
+    "verify_ssl": false
   },
-  "sources": {
+  "data_sources": {
     "homeassistant": {
       "enabled": true,
       "url": "http://192.168.1.10:8123",
@@ -40,8 +40,28 @@
     "backup_count": 5
   },
   "sync": {
-    "dry_run": false,
+    "dry_run": true,
     "full_sync_interval": 86400,
-    "incremental_sync_interval": 3600
-  }
+    "incremental_sync_interval": 3600,
+    "batch_size": 50,
+    "max_workers": 5,
+    "conflict_resolution": {
+      "field_mismatch": "prefer_source",
+      "duplicate_name": "append_suffix",
+      "duplicate_ip": "prefer_newer",
+      "missing_dependency": "create_dependency",
+      "type_mismatch": "prefer_existing",
+      "role_mismatch": "prefer_source"
+    }
+  },
+  "scheduler": {
+    "max_concurrent_jobs": 3,
+    "max_completed_jobs": 100,
+    "rate_limits": {
+      "health_check": 60,
+      "incremental_sync": 300
+    },
+    "job_cleanup_hours": 24
+  },
+  "mapping_config_path": "config/data-mappings.json"
 }
