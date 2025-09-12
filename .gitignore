@@ -132,6 +132,7 @@ dmypy.json
 logs/
 cache/
 *.pid
+config/netbox-agent.json
 
 # IDE
 .vscode/
