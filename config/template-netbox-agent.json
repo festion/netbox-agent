@@ -35,7 +35,7 @@
   },
   "logging": {
     "level": "INFO",
-    "file": "/home/dev/workspace/netbox-agent/logs/netbox-agent.log",
+    "file": "logs/netbox-agent.log",
     "max_size": "10MB",
     "backup_count": 5
   },
