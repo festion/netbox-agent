@@ -133,6 +133,20 @@ class DataSource(ABC):
         pass
     
     @abstractmethod
+    async def connect(self) -> bool:
+        """
+        Establish connection to the data source
+        
+        This method should establish and maintain a persistent connection
+        to the data source. Unlike test_connection which tests and disconnects,
+        this method should keep the connection open for subsequent operations.
+        
+        Returns:
+            True if connection is successful, False otherwise
+        """
+        pass
+    
+    @abstractmethod
     def get_required_config_fields(self) -> List[str]:
         """
         Get list of required configuration fields for this data source

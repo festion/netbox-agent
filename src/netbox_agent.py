@@ -478,7 +478,7 @@ class NetBoxAgent:
             self.logger.info(f"Data source connection status: {connection_status}")
             
             # Test NetBox client
-            if not await self.netbox_client.test_connection():
+            if not self.netbox_client.test_connection():
                 self.logger.error("NetBox client connection failed - cannot proceed")
                 return
             
