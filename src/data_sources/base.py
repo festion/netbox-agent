@@ -52,11 +52,31 @@ class DiscoveryResult(BaseModel):
     def has_errors(self) -> bool:
         """Check if discovery had errors"""
         return len(self.errors) > 0
-    
+
+    @property
+    def success(self) -> bool:
+        """Check if discovery was successful (no errors)"""
+        return not self.has_errors
+
+    @property
+    def error_message(self) -> str:
+        """Get combined error message"""
+        return "; ".join(self.errors) if self.errors else ""
+
+    @property
+    def source(self) -> str:
+        """Get source identifier for backwards compatibility"""
+        return self.source_id
+
+    @property
+    def duration(self) -> float:
+        """Get discovery duration (placeholder for now)"""
+        return 0.0
+
     def add_error(self, error: str):
         """Add an error message"""
         self.errors.append(f"[{datetime.now().isoformat()}] {error}")
-    
+
     def add_warning(self, warning: str):
         """Add a warning message"""
         self.warnings.append(f"[{datetime.now().isoformat()}] {warning}")

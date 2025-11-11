@@ -3,9 +3,10 @@
 import asyncio
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional, Set, Tuple
+from dataclasses import dataclass
 import structlog
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -26,6 +27,48 @@ class ConflictResolution(Enum):
     OVERWRITE = "overwrite"
     MERGE = "merge"
     MANUAL = "manual"
+
+
+class ConflictType(Enum):
+    """Types of synchronization conflicts"""
+    FIELD_MISMATCH = "field_mismatch"
+    DUPLICATE_NAME = "duplicate_name"
+    DUPLICATE_IP = "duplicate_ip"
+    MISSING_DEPENDENCY = "missing_dependency"
+    TYPE_MISMATCH = "type_mismatch"
+    ROLE_MISMATCH = "role_mismatch"
+
+
+class SyncAction(Enum):
+    """Synchronization actions"""
+    CREATE = "create"
+    UPDATE = "update"
+    SKIP = "skip"
+    DELETE = "delete"
+    MERGE = "merge"
+
+
+@dataclass
+class SyncConflict:
+    """Represents a synchronization conflict"""
+    conflict_type: ConflictType
+    source_data: Dict[str, Any]
+    netbox_data: Optional[Dict[str, Any]]
+    device_name: str
+    field_name: Optional[str] = None
+    resolution: Optional[str] = None
+    metadata: Dict[str, Any] = None
+
+
+@dataclass
+class SyncResult:
+    """Results of a synchronization operation"""
+    action: SyncAction
+    device_name: str
+    success: bool
+    error: Optional[str] = None
+    conflicts: List[SyncConflict] = None
+    metadata: Dict[str, Any] = None
 
 
 class SyncStatistics:
@@ -362,3 +405,498 @@ class SyncEngine:
             self.logger.error("Cleanup failed", error=str(e))
         
         return cleanup_stats
+
+
+class AdvancedSyncEngine:
+    """Enhanced synchronization engine with conflict resolution"""
+    
+    def __init__(self, netbox_client: NetBoxClient, config: Dict):
+        self.netbox = netbox_client
+        self.config = config
+        self.logger = structlog.get_logger(__name__)
+        
+        # Caches for performance
+        self.device_cache = {}
+        self.device_type_cache = {}
+        self.device_role_cache = {}
+        self.site_cache = {}
+        self.ip_cache = {}
+        
+        # Conflict tracking
+        self.conflicts = []
+        self.conflict_resolution_rules = self.load_conflict_rules()
+        
+        # Sync statistics
+        self.stats = {
+            'created': 0,
+            'updated': 0,
+            'skipped': 0,
+            'failed': 0,
+            'conflicts': 0
+        }
+    
+    def load_conflict_rules(self) -> Dict:
+        """Load conflict resolution rules from configuration"""
+        default_rules = {
+            ConflictType.FIELD_MISMATCH: "prefer_source",
+            ConflictType.DUPLICATE_NAME: "append_suffix",
+            ConflictType.DUPLICATE_IP: "prefer_newer",
+            ConflictType.MISSING_DEPENDENCY: "create_dependency",
+            ConflictType.TYPE_MISMATCH: "prefer_existing",
+            ConflictType.ROLE_MISMATCH: "prefer_source"
+        }
+        
+        # Override with config if available
+        config_rules = self.config.get("sync", {}).get("conflict_resolution", {})
+        default_rules.update(config_rules)
+        
+        return default_rules
+    
+    async def build_caches(self):
+        """Build caches of existing NetBox objects for performance"""
+        self.logger.info("Building sync caches...")
+        
+        try:
+            # Cache devices
+            devices = list(self.netbox.get_all_devices())
+            for device in devices:
+                device_dict = device.serialize() if hasattr(device, 'serialize') else dict(device)
+                self.device_cache[device_dict['name']] = device_dict
+            self.logger.info(f"Cached {len(self.device_cache)} devices")
+            
+            # Cache IP addresses  
+            ip_addresses = list(self.netbox.get_all_ip_addresses())
+            for ip in ip_addresses:
+                ip_dict = ip.serialize() if hasattr(ip, 'serialize') else dict(ip)
+                self.ip_cache[ip_dict['address']] = ip_dict
+            self.logger.info(f"Cached {len(self.ip_cache)} IP addresses")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to build caches: {e}")
+            raise
+    
+    async def sync_devices_batch(self, 
+                               source_devices: List[Device], 
+                               source_name: str,
+                               dry_run: bool = False) -> List[SyncResult]:
+        """Sync a batch of devices from a single source"""
+        
+        self.logger.info(f"Starting batch sync of {len(source_devices)} devices from {source_name}")
+        
+        # Build caches if needed
+        if not self.device_cache:
+            await self.build_caches()
+        
+        # Process devices
+        results = []
+        
+        # Phase 1: Validate and prepare devices
+        validated_devices = []
+        for device in source_devices:
+            try:
+                validation_result = await self.validate_device(device, source_name)
+                if validation_result.success:
+                    validated_devices.append(device)
+                    results.append(validation_result)
+                else:
+                    results.append(validation_result)
+                    
+            except Exception as e:
+                self.logger.error(f"Validation failed for {device.name}: {e}")
+                results.append(SyncResult(
+                    action=SyncAction.SKIP,
+                    device_name=device.name,
+                    success=False,
+                    error=str(e)
+                ))
+        
+        # Phase 2: Detect conflicts and plan actions
+        sync_plan = await self.create_sync_plan(validated_devices, source_name)
+        
+        # Phase 3: Execute sync plan
+        if not dry_run:
+            execution_results = await self.execute_sync_plan(sync_plan, validated_devices)
+            results.extend(execution_results)
+        else:
+            self.logger.info(f"DRY RUN: Would sync {len(sync_plan)} devices")
+            for device_name, action in sync_plan.items():
+                results.append(SyncResult(
+                    action=action,
+                    device_name=device_name,
+                    success=True,
+                    metadata={"dry_run": True}
+                ))
+        
+        # Update statistics
+        self.update_stats(results)
+        
+        return results
+    
+    async def validate_device(self, device: Device, source_name: str) -> SyncResult:
+        """Validate a device before synchronization"""
+        
+        # Check required fields
+        if not device.name:
+            return SyncResult(
+                action=SyncAction.SKIP,
+                device_name="unnamed",
+                success=False,
+                error="Device name is required"
+            )
+        
+        # Validate device name format
+        if not self.is_valid_device_name(device.name):
+            return SyncResult(
+                action=SyncAction.SKIP,
+                device_name=device.name,
+                success=False,
+                error=f"Invalid device name format: {device.name}"
+            )
+        
+        # Check for IP address format
+        if hasattr(device, 'primary_ip4') and device.primary_ip4 and not self.is_valid_ip(device.primary_ip4):
+            return SyncResult(
+                action=SyncAction.SKIP,
+                device_name=device.name,
+                success=False,
+                error=f"Invalid IP address: {device.primary_ip4}"
+            )
+        
+        return SyncResult(
+            action=SyncAction.CREATE,  # Will be determined later
+            device_name=device.name,
+            success=True
+        )
+    
+    def is_valid_device_name(self, name: str) -> bool:
+        """Check if device name is valid for NetBox"""
+        import re
+        # NetBox device name requirements: alphanumeric, hyphens, underscores
+        pattern = r'^[a-zA-Z0-9._-]+$'
+        return bool(re.match(pattern, name)) and len(name) <= 64
+    
+    def is_valid_ip(self, ip: str) -> bool:
+        """Validate IP address format"""
+        import ipaddress
+        try:
+            ipaddress.ip_address(ip)
+            return True
+        except ValueError:
+            return False
+    
+    async def create_sync_plan(self, devices: List[Device], source_name: str) -> Dict[str, SyncAction]:
+        """Create synchronization plan with conflict detection"""
+        
+        sync_plan = {}
+        
+        for device in devices:
+            action = await self.determine_sync_action(device, source_name)
+            sync_plan[device.name] = action
+        
+        return sync_plan
+    
+    async def determine_sync_action(self, device: Device, source_name: str) -> SyncAction:
+        """Determine what action to take for a device"""
+        
+        existing_device = self.device_cache.get(device.name)
+        
+        if not existing_device:
+            # Check for conflicts with IP address
+            if hasattr(device, 'primary_ip4') and device.primary_ip4 and device.primary_ip4 in self.ip_cache:
+                conflict = SyncConflict(
+                    conflict_type=ConflictType.DUPLICATE_IP,
+                    source_data=device.dict(),
+                    netbox_data=self.ip_cache[device.primary_ip4],
+                    device_name=device.name
+                )
+                
+                resolution = await self.resolve_conflict(conflict)
+                if resolution == "skip":
+                    return SyncAction.SKIP
+                elif resolution == "create_with_suffix":
+                    # Modify device name
+                    device.name = f"{device.name}-{source_name}"
+            
+            return SyncAction.CREATE
+        
+        else:
+            # Device exists - check if update is needed
+            changes = self.detect_changes(device, existing_device)
+            
+            if changes:
+                # Check for conflicts
+                conflicts = self.detect_conflicts(device, existing_device, changes)
+                
+                if conflicts:
+                    # Resolve conflicts
+                    for conflict in conflicts:
+                        resolution = await self.resolve_conflict(conflict)
+                        if resolution == "skip":
+                            return SyncAction.SKIP
+                
+                return SyncAction.UPDATE
+            else:
+                return SyncAction.SKIP
+    
+    def detect_changes(self, source_device: Device, existing_device: Dict) -> List[str]:
+        """Detect changes between source and existing device"""
+        changes = []
+        
+        source_dict = source_device.dict()
+        
+        # Compare key fields
+        comparable_fields = [
+            'device_type', 'device_role', 'site', 'platform',
+            'primary_ip4', 'serial', 'custom_fields'
+        ]
+        
+        for field in comparable_fields:
+            source_value = source_dict.get(field)
+            existing_value = existing_device.get(field)
+            
+            # Handle nested objects (device_type, device_role, site)
+            if isinstance(source_value, dict) and isinstance(existing_value, dict):
+                if not self.compare_nested_objects(source_value, existing_value):
+                    changes.append(field)
+            elif source_value != existing_value:
+                changes.append(field)
+        
+        return changes
+    
+    def compare_nested_objects(self, source_obj: Dict, existing_obj: Dict) -> bool:
+        """Compare nested objects like device_type, device_role"""
+        
+        # Compare by name or slug if available
+        for key in ['name', 'slug', 'model']:
+            if key in source_obj and key in existing_obj:
+                if source_obj[key] != existing_obj[key]:
+                    return False
+        
+        return True
+    
+    def detect_conflicts(self, source_device: Device, existing_device: Dict, changes: List[str]) -> List[SyncConflict]:
+        """Detect conflicts in changed fields"""
+        conflicts = []
+        
+        source_dict = source_device.dict()
+        
+        for field in changes:
+            # Determine conflict type
+            conflict_type = ConflictType.FIELD_MISMATCH
+            
+            if field == 'device_type':
+                conflict_type = ConflictType.TYPE_MISMATCH
+            elif field == 'device_role':
+                conflict_type = ConflictType.ROLE_MISMATCH
+            elif field == 'primary_ip4':
+                conflict_type = ConflictType.DUPLICATE_IP
+            
+            conflict = SyncConflict(
+                conflict_type=conflict_type,
+                source_data=source_dict,
+                netbox_data=existing_device,
+                device_name=source_device.name,
+                field_name=field
+            )
+            
+            conflicts.append(conflict)
+        
+        return conflicts
+    
+    async def resolve_conflict(self, conflict: SyncConflict) -> str:
+        """Resolve a synchronization conflict"""
+        
+        rule = self.conflict_resolution_rules.get(conflict.conflict_type, "prefer_existing")
+        
+        if rule == "prefer_source":
+            return "update"
+        elif rule == "prefer_existing":
+            return "skip"
+        elif rule == "prefer_newer":
+            # Compare discovery timestamps if available
+            source_timestamp = conflict.source_data.get("custom_fields", {}).get("discovery_timestamp")
+            netbox_timestamp = conflict.netbox_data.get("last_updated")
+            
+            if source_timestamp and netbox_timestamp:
+                if source_timestamp > netbox_timestamp:
+                    return "update"
+            return "skip"
+        elif rule == "append_suffix":
+            return "create_with_suffix"
+        elif rule == "create_dependency":
+            # Create missing dependencies (device types, roles, sites)
+            await self.create_dependencies(conflict.source_data)
+            return "update"
+        elif rule == "manual":
+            # Add to manual review queue
+            self.conflicts.append(conflict)
+            return "skip"
+        
+        return "skip"
+    
+    async def create_dependencies(self, device_data: Dict):
+        """Create missing dependencies like device types, roles, sites"""
+        
+        # Create device type if needed
+        device_type = device_data.get("device_type", {})
+        if device_type:
+            await self.ensure_device_type(device_type)
+        
+        # Create device role if needed
+        device_role = device_data.get("device_role", {})
+        if device_role:
+            await self.ensure_device_role(device_role)
+        
+        # Create site if needed
+        site = device_data.get("site", {})
+        if site:
+            await self.ensure_site(site)
+    
+    async def ensure_device_type(self, device_type_data: Dict):
+        """Ensure device type exists in NetBox"""
+        manufacturer = device_type_data.get("manufacturer")
+        model = device_type_data.get("model")
+        
+        if not manufacturer or not model:
+            return
+        
+        key = f"{manufacturer}-{model}"
+        
+        if key not in self.device_type_cache:
+            try:
+                # For now, just log - would need NetBox client methods
+                self.logger.info(f"Would create device type: {manufacturer} {model}")
+                
+            except Exception as e:
+                self.logger.error(f"Failed to create device type {key}: {e}")
+    
+    async def ensure_device_role(self, device_role_data: Dict):
+        """Ensure device role exists in NetBox"""
+        name = device_role_data.get("name")
+        
+        if not name:
+            return
+        
+        if name not in self.device_role_cache:
+            try:
+                # For now, just log - would need NetBox client methods
+                self.logger.info(f"Would create device role: {name}")
+                
+            except Exception as e:
+                self.logger.error(f"Failed to create device role {name}: {e}")
+    
+    async def ensure_site(self, site_data: Dict):
+        """Ensure site exists in NetBox"""
+        name = site_data.get("name")
+        
+        if not name:
+            return
+        
+        if name not in self.site_cache:
+            try:
+                # For now, just log - would need NetBox client methods
+                self.logger.info(f"Would create site: {name}")
+                
+            except Exception as e:
+                self.logger.error(f"Failed to create site {name}: {e}")
+    
+    async def execute_sync_plan(self, sync_plan: Dict[str, SyncAction], devices: List[Device]) -> List[SyncResult]:
+        """Execute the synchronization plan"""
+        
+        results = []
+        device_dict = {device.name: device for device in devices}
+        
+        for device_name, action in sync_plan.items():
+            device = device_dict.get(device_name)
+            if not device:
+                continue
+                
+            try:
+                if action == SyncAction.CREATE:
+                    result = await self.create_single_device(device)
+                    results.append(result)
+                elif action == SyncAction.UPDATE:
+                    result = await self.update_single_device(device)
+                    results.append(result)
+                elif action == SyncAction.SKIP:
+                    results.append(SyncResult(
+                        action=SyncAction.SKIP,
+                        device_name=device_name,
+                        success=True
+                    ))
+                    
+            except Exception as e:
+                results.append(SyncResult(
+                    action=action,
+                    device_name=device_name,
+                    success=False,
+                    error=str(e)
+                ))
+        
+        return results
+    
+    async def create_single_device(self, device: Device) -> SyncResult:
+        """Create a single device"""
+        try:
+            # For now, simulate creation - would use NetBox client
+            self.logger.info(f"Would create device: {device.name}")
+            
+            return SyncResult(
+                action=SyncAction.CREATE,
+                device_name=device.name,
+                success=True,
+                metadata={"simulated": True}
+            )
+            
+        except Exception as e:
+            return SyncResult(
+                action=SyncAction.CREATE,
+                device_name=device.name,
+                success=False,
+                error=str(e)
+            )
+    
+    async def update_single_device(self, device: Device) -> SyncResult:
+        """Update a single device"""
+        try:
+            # For now, simulate update - would use NetBox client
+            self.logger.info(f"Would update device: {device.name}")
+            
+            return SyncResult(
+                action=SyncAction.UPDATE,
+                device_name=device.name,
+                success=True,
+                metadata={"simulated": True}
+            )
+            
+        except Exception as e:
+            return SyncResult(
+                action=SyncAction.UPDATE,
+                device_name=device.name,
+                success=False,
+                error=str(e)
+            )
+    
+    def update_stats(self, results: List[SyncResult]):
+        """Update synchronization statistics"""
+        for result in results:
+            if result.success:
+                if result.action == SyncAction.CREATE:
+                    self.stats['created'] += 1
+                elif result.action == SyncAction.UPDATE:
+                    self.stats['updated'] += 1
+                elif result.action == SyncAction.SKIP:
+                    self.stats['skipped'] += 1
+            else:
+                self.stats['failed'] += 1
+            
+            if result.conflicts:
+                self.stats['conflicts'] += len(result.conflicts)
+    
+    def get_sync_statistics(self) -> Dict:
+        """Get synchronization statistics"""
+        return self.stats.copy()
+    
+    def get_unresolved_conflicts(self) -> List[SyncConflict]:
+        """Get list of unresolved conflicts"""
+        return self.conflicts.copy()

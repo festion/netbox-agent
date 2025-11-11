@@ -44,7 +44,7 @@ class NetworkScannerDataSource(NetworkDataSource):
                 
                 # Extract IP addresses
                 for device in network_devices:
-                    if device.primary_ip4:
+                    if hasattr(device, 'primary_ip4') and device.primary_ip4:
                         ip_addr = IPAddress(
                             address=device.primary_ip4,
                             status="active",
