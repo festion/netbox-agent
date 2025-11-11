@@ -7,6 +7,7 @@ from src.data_sources.home_assistant import HomeAssistantDataSource, HomeAssista
 from src.data_sources.network_scanner import NetworkScannerDataSource, NetworkScannerConfig
 from src.data_sources.filesystem import FilesystemDataSource, FilesystemDataSourceConfig
 from src.data_sources.proxmox import ProxmoxDataSource, ProxmoxDataSourceConfig
+from src.data_sources.truenas import TrueNASDataSource, TrueNASDataSourceConfig
 from src.data_sources.base import DataSource, DiscoveryResult, DataSourceType
 from src.netbox.models import Device
 
@@ -60,7 +61,16 @@ class DataSourceManager:
                 print("Initialized Proxmox data source")
             except Exception as e:
                 print(f"Failed to initialize Proxmox data source: {e}")
-        
+
+        # TrueNAS
+        if self.config.get("data_sources", {}).get("truenas", {}).get("enabled"):
+            try:
+                truenas_config = TrueNASDataSourceConfig(**self.config.get("data_sources", {}).get("truenas", {}))
+                self.sources["truenas"] = TrueNASDataSource(truenas_config)
+                print("Initialized TrueNAS data source")
+            except Exception as e:
+                print(f"Failed to initialize TrueNAS data source: {e}")
+
         print(f"Data source manager initialized with {len(self.sources)} sources: {list(self.sources.keys())}")
     
     def _generate_device_signature(self, device: Device) -> str:

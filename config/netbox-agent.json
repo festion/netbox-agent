@@ -35,9 +35,14 @@
       "cluster_name": "homelab-cluster"
     },
     "truenas": {
-      "enabled": false,
-      "url": "https://truenas.example.com",
-      "api_key": "your-truenas-api-key"
+      "enabled": true,
+      "url": "https://192.168.1.98",
+      "api_key": "3-MiUAHyVcNyrEcA9euEcM6HA14ar9X2PeVr57D7E31rh5IXDzP7GUg6HGstZC1zZh",
+      "verify_ssl": false,
+      "include_pools": true,
+      "include_datasets": true,
+      "include_shares": true,
+      "include_network": true
     }
   },
   "logging": {
