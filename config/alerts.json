@@ -1,0 +1,166 @@
+{
+  "alert_rules": {
+    "system_health": {
+      "critical_disk_space": {
+        "condition": "disk_free_gb < 1",
+        "severity": "critical",
+        "message": "Critical: Less than 1GB disk space remaining",
+        "actions": ["notify_admin", "log_critical"]
+      },
+      "low_disk_space": {
+        "condition": "disk_free_gb < 5",
+        "severity": "warning",
+        "message": "Warning: Less than 5GB disk space remaining",
+        "actions": ["notify_admin", "log_warning"]
+      },
+      "high_memory_usage": {
+        "condition": "system_memory_percent > 85",
+        "severity": "warning",
+        "message": "Warning: System memory usage above 85%",
+        "actions": ["notify_admin", "log_warning"]
+      },
+      "critical_memory_usage": {
+        "condition": "system_memory_percent > 90",
+        "severity": "critical",
+        "message": "Critical: System memory usage above 90%",
+        "actions": ["notify_admin", "log_critical"]
+      },
+      "high_cpu_usage": {
+        "condition": "cpu_percent > 90",
+        "severity": "warning",
+        "message": "Warning: CPU usage above 90%",
+        "actions": ["log_warning"]
+      },
+      "process_memory_high": {
+        "condition": "process_memory_mb > 1000",
+        "severity": "warning",
+        "message": "Warning: NetBox Agent process using over 1GB memory",
+        "actions": ["notify_admin", "log_warning"]
+      }
+    },
+    "netbox_connectivity": {
+      "netbox_unreachable": {
+        "condition": "netbox_api_status == 'critical'",
+        "severity": "critical",
+        "message": "Critical: NetBox API is unreachable",
+        "actions": ["notify_admin", "log_critical", "retry_connection"]
+      },
+      "netbox_slow_response": {
+        "condition": "netbox_api_response_time > 5",
+        "severity": "warning",
+        "message": "Warning: NetBox API response time above 5 seconds",
+        "actions": ["log_warning"]
+      },
+      "netbox_degraded": {
+        "condition": "netbox_api_status == 'unhealthy'",
+        "severity": "warning",
+        "message": "Warning: NetBox API responding but with errors",
+        "actions": ["notify_admin", "log_warning"]
+      }
+    },
+    "sync_operations": {
+      "sync_failure": {
+        "condition": "sync_failed_count > 3",
+        "severity": "critical",
+        "message": "Critical: More than 3 sync operations failed",
+        "actions": ["notify_admin", "log_critical"]
+      },
+      "high_sync_error_rate": {
+        "condition": "sync_error_rate > 0.2",
+        "severity": "warning",
+        "message": "Warning: Sync error rate above 20%",
+        "actions": ["notify_admin", "log_warning"]
+      },
+      "sync_duration_high": {
+        "condition": "sync_duration_seconds > 600",
+        "severity": "warning",
+        "message": "Warning: Sync operation took longer than 10 minutes",
+        "actions": ["log_warning"]
+      },
+      "no_devices_synced": {
+        "condition": "devices_synced_count == 0 AND sync_completed == true",
+        "severity": "warning",
+        "message": "Warning: Sync completed but no devices were synced",
+        "actions": ["log_warning"]
+      }
+    },
+    "discovery_operations": {
+      "discovery_failure": {
+        "condition": "discovery_failed_count > 3",
+        "severity": "critical",
+        "message": "Critical: More than 3 discovery operations failed",
+        "actions": ["notify_admin", "log_critical"]
+      },
+      "high_discovery_error_rate": {
+        "condition": "discovery_error_rate > 0.2",
+        "severity": "warning",
+        "message": "Warning: Discovery error rate above 20%",
+        "actions": ["notify_admin", "log_warning"]
+      },
+      "no_devices_discovered": {
+        "condition": "devices_discovered_count == 0 AND discovery_completed == true",
+        "severity": "warning",
+        "message": "Warning: Discovery completed but no devices found",
+        "actions": ["log_warning"]
+      },
+      "discovery_timeout": {
+        "condition": "discovery_duration_seconds > 300",
+        "severity": "warning",
+        "message": "Warning: Discovery operation took longer than 5 minutes",
+        "actions": ["log_warning"]
+      }
+    },
+    "data_source_health": {
+      "data_source_unreachable": {
+        "condition": "data_source_connection_failed == true",
+        "severity": "critical",
+        "message": "Critical: Data source is unreachable",
+        "actions": ["notify_admin", "log_critical", "retry_connection"]
+      },
+      "data_source_slow": {
+        "condition": "data_source_response_time > 10",
+        "severity": "warning",
+        "message": "Warning: Data source response time above 10 seconds",
+        "actions": ["log_warning"]
+      },
+      "data_source_auth_failure": {
+        "condition": "data_source_auth_failed == true",
+        "severity": "critical",
+        "message": "Critical: Data source authentication failed",
+        "actions": ["notify_admin", "log_critical"]
+      }
+    }
+  },
+  "notification_channels": {
+    "log_warning": {
+      "type": "logging",
+      "level": "warning",
+      "enabled": true
+    },
+    "log_critical": {
+      "type": "logging",
+      "level": "critical",
+      "enabled": true
+    },
+    "notify_admin": {
+      "type": "webhook",
+      "url": "${ALERT_WEBHOOK_URL}",
+      "enabled": false,
+      "note": "Configure ALERT_WEBHOOK_URL in .env to enable"
+    },
+    "retry_connection": {
+      "type": "action",
+      "action": "retry_connection",
+      "max_retries": 3,
+      "retry_delay_seconds": 30,
+      "enabled": true
+    }
+  },
+  "alert_settings": {
+    "check_interval_seconds": 60,
+    "evaluation_window_seconds": 300,
+    "cooldown_seconds": 300,
+    "aggregate_similar_alerts": true,
+    "max_alerts_per_hour": 10
+  }
+}
