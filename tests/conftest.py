@@ -197,16 +197,20 @@ def assert_device_valid(device):
     assert device.device_role is not None
     assert device.site is not None
 
-def create_mock_device(name="test-device", ip="192.168.1.100"):
+def create_mock_device(name="test-device", ip="192.168.1.100",
+                      manufacturer="Test Manufacturer", model="Test Model"):
     """Create a mock device for testing"""
     from src.netbox.models import Device, DeviceType, DeviceRole, Site
+
+    # Generate slug from manufacturer and model
+    slug = f"{manufacturer.lower().replace(' ', '-')}-{model.lower().replace(' ', '-')}"
 
     return Device(
         name=name,
         device_type=DeviceType(
-            manufacturer="Test Manufacturer",
-            model="Test Model",
-            slug="test-manufacturer-test-model"
+            manufacturer=manufacturer,
+            model=model,
+            slug=slug
         ),
         device_role=DeviceRole(
             name="Test Role",
