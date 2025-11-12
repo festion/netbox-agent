@@ -181,12 +181,20 @@ class DataSourceManager:
         """Enhance primary device with information from secondary device"""
         enhanced = primary.model_copy(deep=True)
         
-        # Enhance device type information
-        if not enhanced.device_type.get("manufacturer") and secondary.device_type.get("manufacturer"):
-            enhanced.device_type["manufacturer"] = secondary.device_type["manufacturer"]
-        
-        if not enhanced.device_type.get("model") and secondary.device_type.get("model"):
-            enhanced.device_type["model"] = secondary.device_type["model"]
+        # Enhance device type information (Pydantic models use attributes, not dict access)
+        device_type_updated = False
+        updates = {}
+
+        if not enhanced.device_type.manufacturer and secondary.device_type.manufacturer:
+            updates['manufacturer'] = secondary.device_type.manufacturer
+            device_type_updated = True
+
+        if not enhanced.device_type.model and secondary.device_type.model:
+            updates['model'] = secondary.device_type.model
+            device_type_updated = True
+
+        if device_type_updated:
+            enhanced.device_type = enhanced.device_type.model_copy(update=updates)
         
         # Enhance IP information (prefer network scanner for accuracy)
         if secondary_source == "network_scanner" and secondary.primary_ip4:
