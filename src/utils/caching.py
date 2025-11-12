@@ -91,7 +91,7 @@ def cache_result(ttl: int = 300):
             async def async_wrapper(*args, **kwargs):
                 # Generate cache key
                 key_data = f"{func.__name__}{args}{kwargs}"
-                cache_key = hashlib.md5(key_data.encode()).hexdigest()
+                cache_key = hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
                 
                 # Try to get from cache
                 if hasattr(func, '_cache'):

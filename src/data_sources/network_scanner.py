@@ -18,6 +18,7 @@ class NetworkScannerConfig(DataSourceConfig):
     nmap_options: str = "-sS -O"
     skip_ping_test: bool = False
     subnet_site_mapping: Dict[str, str] = {}
+    verify_ssl: bool = False  # Default False for discovering unknown devices with self-signed certs
 
 class NetworkScannerDataSource(NetworkDataSource):
     """Data source for network scanning and device discovery"""
@@ -297,7 +298,7 @@ class NetworkScannerDataSource(NetworkDataSource):
             response = requests.get(
                 f"http://{ip}:{port}/",
                 timeout=self.scan_config.timeout,
-                verify=False
+                verify=self.scan_config.verify_ssl
             )
             
             service = base_service.copy()
@@ -339,7 +340,7 @@ class NetworkScannerDataSource(NetworkDataSource):
             response = requests.get(
                 f"https://{ip}:{port}/",
                 timeout=self.scan_config.timeout,
-                verify=False
+                verify=self.scan_config.verify_ssl
             )
             
             service = base_service.copy()

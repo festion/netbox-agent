@@ -99,7 +99,7 @@ class DataSourceManager:
         
         # Create hash of all signature parts
         signature_string = "|".join(sorted(signature_parts))
-        return hashlib.md5(signature_string.encode()).hexdigest()
+        return hashlib.md5(signature_string.encode(), usedforsecurity=False).hexdigest()
     
     def _deduplicate_devices(self, discovery_results: Dict[str, DiscoveryResult]) -> List[Device]:
         """Deduplicate devices across all discovery results"""
