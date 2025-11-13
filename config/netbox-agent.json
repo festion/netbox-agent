@@ -1,13 +1,13 @@
 {
   "netbox": {
-    "url": "http://192.168.1.138",
+    "url": "https://netbox.internal.lakehouse.wtf/",
     "token": "60f3fd1bff8178cc53dea8b86f624231d41b2415",
     "verify_ssl": false
   },
   "data_sources": {
     "homeassistant": {
       "enabled": true,
-      "url": "http://192.168.1.10:8123",
+      "url": "http://192.168.1.155:8123",
       "token_path": "/config/ha_token",
       "sync_interval": 3600
     },

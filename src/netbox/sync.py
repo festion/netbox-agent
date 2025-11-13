@@ -788,18 +788,100 @@ class AdvancedSyncEngine:
     async def ensure_site(self, site_data: Dict):
         """Ensure site exists in NetBox"""
         name = site_data.get("name")
-        
+
         if not name:
             return
-        
+
         if name not in self.site_cache:
             try:
                 # For now, just log - would need NetBox client methods
                 self.logger.info(f"Would create site: {name}")
-                
+
             except Exception as e:
                 self.logger.error(f"Failed to create site {name}: {e}")
-    
+
+    async def ensure_site_exists(self, site_data: Dict) -> int:
+        """Ensure site exists in NetBox and return its ID"""
+        slug = site_data.get("slug")
+        name = site_data.get("name")
+
+        # Sanitize slug - replace dots and other invalid chars with hyphens
+        slug = slug.replace(".", "-").replace("_", "-")
+        # Ensure slug only contains valid characters
+        slug = "".join(c if c.isalnum() or c == "-" else "-" for c in slug)
+
+        # Try to find existing site by slug
+        existing_site = self.netbox.get_site(slug=slug)
+        if existing_site:
+            self.logger.debug(f"Found existing site: {name} (ID: {existing_site.id})")
+            return existing_site.id
+
+        # Create new site
+        site_payload = {
+            "name": name,
+            "slug": slug,
+            "description": site_data.get("description", "")
+        }
+
+        created_site = self.netbox.create_site(site_payload)
+        if created_site and hasattr(created_site, 'id'):
+            self.logger.info(f"Created site: {name} (ID: {created_site.id})")
+            return created_site.id
+
+        raise Exception(f"Failed to create or find site: {name}")
+
+    async def ensure_device_role_exists(self, role_data: Dict) -> int:
+        """Ensure device role exists in NetBox and return its ID"""
+        name = role_data.get("name")
+        color = role_data.get("color", "9e9e9e")
+
+        # Use NetBoxClient's get_or_create_device_role method
+        existing_role = self.netbox.get_or_create_device_role(
+            name=name,
+            color=color,
+            vm_role=role_data.get("vm_role", False),
+            description=role_data.get("description", "")
+        )
+
+        if existing_role and hasattr(existing_role, 'id'):
+            self.logger.debug(f"Device role ready: {name} (ID: {existing_role.id})")
+            return existing_role.id
+
+        raise Exception(f"Failed to create or find device role: {name}")
+
+    async def ensure_device_type_exists(self, type_data: Dict) -> int:
+        """Ensure device type exists in NetBox and return its ID"""
+        model = type_data.get("model")
+        manufacturer_name = type_data.get("manufacturer", "Generic")
+
+        # Use NetBoxClient's get_or_create_device_type method
+        device_type = self.netbox.get_or_create_device_type(
+            manufacturer=manufacturer_name,
+            model=model,
+            u_height=type_data.get("u_height", 1.0),
+            is_full_depth=type_data.get("is_full_depth", True)
+        )
+
+        if device_type and hasattr(device_type, 'id'):
+            self.logger.debug(f"Device type ready: {model} (ID: {device_type.id})")
+            return device_type.id
+
+        raise Exception(f"Failed to create or find device type: {model}")
+
+    async def ensure_manufacturer_exists(self, manufacturer_name: str) -> int:
+        """Ensure manufacturer exists in NetBox and return its ID"""
+        if not manufacturer_name:
+            manufacturer_name = "Generic"
+
+        # Use NetBoxClient's get_or_create_manufacturer method
+        manufacturer = self.netbox.get_or_create_manufacturer(manufacturer_name)
+
+        if manufacturer and hasattr(manufacturer, 'id'):
+            self.logger.debug(f"Manufacturer ready: {manufacturer_name} (ID: {manufacturer.id})")
+            return manufacturer.id
+
+        raise Exception(f"Failed to create or find manufacturer: {manufacturer_name}")
+
     async def execute_sync_plan(self, sync_plan: Dict[str, SyncAction], devices: List[Device]) -> List[SyncResult]:
         """Execute the synchronization plan"""
         
@@ -838,17 +920,87 @@ class AdvancedSyncEngine:
     async def create_single_device(self, device: Device) -> SyncResult:
         """Create a single device"""
         try:
-            # For now, simulate creation - would use NetBox client
-            self.logger.info(f"Would create device: {device.name}")
-            
-            return SyncResult(
-                action=SyncAction.CREATE,
-                device_name=device.name,
-                success=True,
-                metadata={"simulated": True}
-            )
-            
+            device_dict = device.dict(exclude_unset=True)
+
+            # Log what we're trying to create
+            self.logger.info(f"Attempting to create device: {device.name}",
+                           device_type=device_dict.get('device_type'),
+                           site=device_dict.get('site'),
+                           role=device_dict.get('device_role'),
+                           device_data=device_dict)
+
+            # Step 1: Ensure dependencies exist and get their IDs
+            # Handle site
+            site_data = device_dict.get('site')
+            if isinstance(site_data, dict):
+                site_id = await self.ensure_site_exists(site_data)
+                device_dict['site'] = site_id
+            elif not site_data:
+                # Use default site if none provided
+                device_dict['site'] = await self.ensure_site_exists({"name": "Default", "slug": "default"})
+
+            # Handle device_role
+            role_data = device_dict.get('device_role')
+            if isinstance(role_data, dict):
+                role_id = await self.ensure_device_role_exists(role_data)
+                device_dict['device_role'] = role_id
+            elif not role_data:
+                # Use default role if none provided
+                device_dict['device_role'] = await self.ensure_device_role_exists({"name": "Server", "slug": "server"})
+
+            # Handle device_type (which includes manufacturer)
+            type_data = device_dict.get('device_type')
+            if isinstance(type_data, dict):
+                type_id = await self.ensure_device_type_exists(type_data)
+                device_dict['device_type'] = type_id
+            elif not type_data:
+                # Use default device type if none provided
+                device_dict['device_type'] = await self.ensure_device_type_exists({
+                    "manufacturer": "Generic",
+                    "model": "Generic Device",
+                    "slug": "generic-device"
+                })
+
+            # Handle platform - convert string to None (or look up later if needed)
+            if isinstance(device_dict.get('platform'), str):
+                # For now, remove platform strings - they need to be platform IDs
+                device_dict.pop('platform', None)
+
+            # Step 2: Rename device_role to role for NetBox API
+            if 'device_role' in device_dict:
+                device_dict['role'] = device_dict.pop('device_role')
+
+            # Step 2.5: Remove custom_fields for now (they need to be defined in NetBox first)
+            device_dict.pop('custom_fields', None)
+
+            # Step 3: Create device in NetBox with resolved IDs
+            self.logger.info(f"Creating device with resolved IDs: {device.name}",
+                           device_type_id=device_dict.get('device_type'),
+                           site_id=device_dict.get('site'),
+                           role_id=device_dict.get('role'))
+
+            # NetBoxClient.create_device() expects a dict, not a Pydantic model
+            created_device = self.netbox.create_device(device_dict)
+
+            if created_device:
+                self.logger.info(f"Created device: {device.name}", device_id=created_device.id)
+                return SyncResult(
+                    action=SyncAction.CREATE,
+                    device_name=device.name,
+                    success=True,
+                    metadata={"device_id": created_device.id}
+                )
+            else:
+                self.logger.error(f"NetBox API returned None for device: {device.name}", device_data=device_dict)
+                return SyncResult(
+                    action=SyncAction.CREATE,
+                    device_name=device.name,
+                    success=False,
+                    error="Failed to create device in NetBox - API returned None"
+                )
+
         except Exception as e:
+            self.logger.error(f"Exception creating device: {device.name}", error=str(e), error_type=type(e).__name__)
             return SyncResult(
                 action=SyncAction.CREATE,
                 device_name=device.name,
@@ -859,16 +1011,37 @@ class AdvancedSyncEngine:
     async def update_single_device(self, device: Device) -> SyncResult:
         """Update a single device"""
         try:
-            # For now, simulate update - would use NetBox client
-            self.logger.info(f"Would update device: {device.name}")
-            
-            return SyncResult(
-                action=SyncAction.UPDATE,
-                device_name=device.name,
-                success=True,
-                metadata={"simulated": True}
-            )
-            
+            # Find existing device in cache
+            existing_device = self.device_cache.get(device.name.lower())
+
+            if not existing_device:
+                return SyncResult(
+                    action=SyncAction.UPDATE,
+                    device_name=device.name,
+                    success=False,
+                    error="Device not found in NetBox"
+                )
+
+            # Update device in NetBox
+            device_dict = device.dict(exclude_unset=True)
+            updated_device = self.netbox.update_device(existing_device.id, device_dict)
+
+            if updated_device:
+                self.logger.info(f"Updated device: {device.name}", device_id=existing_device.id)
+                return SyncResult(
+                    action=SyncAction.UPDATE,
+                    device_name=device.name,
+                    success=True,
+                    metadata={"device_id": existing_device.id}
+                )
+            else:
+                return SyncResult(
+                    action=SyncAction.UPDATE,
+                    device_name=device.name,
+                    success=False,
+                    error="Failed to update device in NetBox"
+                )
+
         except Exception as e:
             return SyncResult(
                 action=SyncAction.UPDATE,

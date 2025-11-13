@@ -20,6 +20,9 @@ COPY scripts/ scripts/
 RUN mkdir -p logs cache && chown -R netboxagent:netboxagent /app
 USER netboxagent
 
+# Set Python path
+ENV PYTHONPATH=/app
+
 # Health check
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 \
     CMD python scripts/health_check.py || exit 1

@@ -198,7 +198,67 @@ class NetBoxClient:
         except Exception as e:
             self.logger.error("Failed to get devices", error=str(e), filters=filters)
             raise
-    
+
+    def get_all_devices(self, limit: int = None, offset: int = 0) -> List:
+        """
+        Get all devices from NetBox with pagination support
+
+        Args:
+            limit: Maximum number of devices to return (None for all)
+            offset: Number of devices to skip
+
+        Returns:
+            List of device objects
+        """
+        try:
+            devices = []
+            page_size = 100  # NetBox default page size
+            current_offset = offset
+
+            self.logger.debug("Fetching all devices from NetBox", limit=limit, offset=offset)
+
+            while True:
+                # Fetch page of devices
+                if limit and len(devices) >= limit:
+                    # We've reached the limit
+                    devices = devices[:limit]
+                    break
+
+                # Calculate how many to fetch in this page
+                if limit:
+                    remaining = limit - len(devices)
+                    fetch_limit = min(page_size, remaining)
+                else:
+                    fetch_limit = page_size
+
+                # Fetch devices with pagination
+                page = list(self.api.dcim.devices.filter(
+                    limit=fetch_limit,
+                    offset=current_offset
+                ))
+
+                if not page:
+                    # No more devices
+                    break
+
+                devices.extend(page)
+
+                # If we got fewer devices than requested, we've reached the end
+                if len(page) < fetch_limit:
+                    break
+
+                current_offset += len(page)
+
+            self.logger.info("Fetched all devices from NetBox",
+                           total_devices=len(devices),
+                           limit=limit,
+                           offset=offset)
+            return devices
+
+        except Exception as e:
+            self.logger.error("Failed to get all devices", error=str(e), limit=limit, offset=offset)
+            raise
+
     def get_device(self, name: str) -> Optional[Any]:
         """Get a device by name"""
         try:
@@ -237,6 +297,60 @@ class NetBoxClient:
                             device_id=device_id, device_data=device_data)
             raise
     
+    def get_all_sites(self, limit: int = None) -> List:
+        """
+        Get all sites from NetBox with pagination support
+
+        Args:
+            limit: Maximum number of sites to return (None for all)
+
+        Returns:
+            List of site objects
+        """
+        try:
+            if limit:
+                return list(self.api.dcim.sites.filter(limit=limit))
+            return list(self.api.dcim.sites.all())
+        except Exception as e:
+            self.logger.error("Failed to get all sites", error=str(e))
+            raise
+
+    def get_all_device_types(self, limit: int = None) -> List:
+        """
+        Get all device types from NetBox
+
+        Args:
+            limit: Maximum number to return (None for all)
+
+        Returns:
+            List of device type objects
+        """
+        try:
+            if limit:
+                return list(self.api.dcim.device_types.filter(limit=limit))
+            return list(self.api.dcim.device_types.all())
+        except Exception as e:
+            self.logger.error("Failed to get all device types", error=str(e))
+            raise
+
+    def get_all_device_roles(self, limit: int = None) -> List:
+        """
+        Get all device roles from NetBox
+
+        Args:
+            limit: Maximum number to return (None for all)
+
+        Returns:
+            List of device role objects
+        """
+        try:
+            if limit:
+                return list(self.api.dcim.device_roles.filter(limit=limit))
+            return list(self.api.dcim.device_roles.all())
+        except Exception as e:
+            self.logger.error("Failed to get all device roles", error=str(e))
+            raise
+
     # IPAM Methods
     def get_ip_addresses(self, **filters) -> List:
         """Get IP addresses with optional filtering"""
@@ -246,6 +360,52 @@ class NetBoxClient:
             return list(self.api.ipam.ip_addresses.all())
         except Exception as e:
             self.logger.error("Failed to get IP addresses", error=str(e), filters=filters)
+            raise
+
+    def get_all_ip_addresses(self, limit: int = None) -> List:
+        """
+        Get all IP addresses from NetBox with pagination support
+
+        Args:
+            limit: Maximum number to return (None for all)
+
+        Returns:
+            List of IP address objects
+        """
+        try:
+            addresses = []
+            page_size = 100
+            current_offset = 0
+
+            self.logger.debug("Fetching all IP addresses from NetBox", limit=limit)
+
+            while True:
+                if limit and len(addresses) >= limit:
+                    addresses = addresses[:limit]
+                    break
+
+                fetch_limit = min(page_size, limit - len(addresses)) if limit else page_size
+
+                page = list(self.api.ipam.ip_addresses.filter(
+                    limit=fetch_limit,
+                    offset=current_offset
+                ))
+
+                if not page:
+                    break
+
+                addresses.extend(page)
+
+                if len(page) < fetch_limit:
+                    break
+
+                current_offset += len(page)
+
+            self.logger.info("Fetched all IP addresses from NetBox", total=len(addresses))
+            return addresses
+
+        except Exception as e:
+            self.logger.error("Failed to get all IP addresses", error=str(e))
             raise
     
     def get_ip_address(self, address: str) -> Optional[Any]:
