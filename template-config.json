@@ -14,7 +14,9 @@
     "configuration": {
       "filesystem": {
         "enabled": true,
-        "allowedDirectories": [".", "./src", "./docs", "./scripts", "./config", "./logs"]
+        "allowedDirectories": [".", "./src", "./docs", "./scripts", "./config", "./logs"],
+        "config_paths": ["/etc/dhcp/dhcpd.conf", "/etc/ansible/hosts"],
+        "mcp_port": 8125
       },
       "github": {
         "enabled": true,
@@ -23,7 +25,21 @@
       "homeAssistant": {
         "enabled": true,
         "apiUrl": "http://192.168.1.10:8123",
-        "tokenPath": "/config/ha_token"
+        "tokenPath": "/config/ha_token",
+        "mcp_port": 8124
+      },
+      "proxmox": {
+        "enabled": false,
+        "url": "https://proxmox.local:8006",
+        "username": "root@pam",
+        "token": "",
+        "mcp_port": 8126
+      },
+      "truenas": {
+        "enabled": false,
+        "url": "https://truenas.local",
+        "api_key": "",
+        "mcp_port": 8127
       },
       "networkFs": {
         "enabled": true,

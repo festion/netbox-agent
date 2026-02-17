@@ -297,7 +297,13 @@ class NetBoxAgent:
             # Process each source with advanced sync engine
             sync_results = {}
             
-            for source_name, devices in all_discovered_devices.items():
+            for source_name, discovery_result in all_discovered_devices.items():
+                # Skip internal entries like _deduplicated
+                if source_name.startswith('_'):
+                    continue
+                    
+                # Extract devices from DiscoveryResult
+                devices = discovery_result.devices if hasattr(discovery_result, 'devices') else discovery_result
                 if not devices:
                     continue
                 

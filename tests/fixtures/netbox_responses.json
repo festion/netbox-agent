@@ -1,0 +1,75 @@
+{
+  "devices": [
+    {
+      "id": 1,
+      "name": "core-router-01",
+      "device_type": {
+        "id": 1,
+        "manufacturer": "Ubiquiti",
+        "model": "Dream Machine Pro"
+      },
+      "device_role": {
+        "id": 1,
+        "name": "Router"
+      },
+      "site": {
+        "id": 1,
+        "name": "Main Site"
+      },
+      "primary_ip4": "192.168.1.1"
+    },
+    {
+      "id": 2,
+      "name": "access-switch-01",
+      "device_type": {
+        "id": 2,
+        "manufacturer": "Cisco",
+        "model": "Catalyst 2960"
+      },
+      "device_role": {
+        "id": 2,
+        "name": "Switch"
+      },
+      "site": {
+        "id": 1,
+        "name": "Main Site"
+      },
+      "primary_ip4": "192.168.1.10"
+    }
+  ],
+  "device_types": [
+    {
+      "id": 1,
+      "manufacturer": "Ubiquiti",
+      "model": "Dream Machine Pro",
+      "slug": "ubiquiti-dream-machine-pro"
+    },
+    {
+      "id": 2,
+      "manufacturer": "Cisco", 
+      "model": "Catalyst 2960",
+      "slug": "cisco-catalyst-2960"
+    }
+  ],
+  "device_roles": [
+    {
+      "id": 1,
+      "name": "Router",
+      "slug": "router",
+      "color": "ff0000"
+    },
+    {
+      "id": 2,
+      "name": "Switch",
+      "slug": "switch", 
+      "color": "00ff00"
+    }
+  ],
+  "sites": [
+    {
+      "id": 1,
+      "name": "Main Site",
+      "slug": "main-site"
+    }
+  ]
+}

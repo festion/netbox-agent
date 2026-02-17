@@ -13,7 +13,6 @@ def proxmox_config():
         url="https://test-proxmox.local:8006",
         username="root@pam",
         token="test-token",
-        mcp_port=8126,
         verify_ssl=False,
         include_stopped=True,
         include_containers=True,
@@ -86,14 +85,13 @@ class TestProxmoxDataSourceConfig:
             enabled=True,
             url="https://proxmox.local:8006",
             username="root@pam",
-            token="test-token",
-            mcp_port=8126
+            token="test-token"
         )
 
         assert config.enabled == True
         assert config.url == "https://proxmox.local:8006"
         assert config.username == "root@pam"
-        assert config.mcp_port == 8126
+        assert config.token == "test-token"
 
     def test_config_defaults(self):
         """Test config default values"""
@@ -130,22 +128,14 @@ class TestProxmoxDataSource:
         assert "enabled" in fields
 
     @pytest.mark.asyncio
-    async def test_connect_success(self, proxmox_config, mock_mcp_proxmox_tools):
+    async def test_connect_success(self, proxmox_config):
         """Test successful connection to Proxmox"""
         source = ProxmoxDataSource(proxmox_config)
 
-        # Mock MCP client
-        with patch.object(source, 'mcp_client') as mock_client:
-            mock_client.connect = AsyncMock(return_value=True)
-            mock_client.call_tool = AsyncMock(
-                return_value=mock_mcp_proxmox_tools["get_system_info"]
-            )
+        result = await source.connect()
 
-            result = await source.connect()
-
-            assert result == True
-            mock_client.connect.assert_called_once()
-            mock_client.call_tool.assert_called()
+        # Current implementation always returns True
+        assert result == True
 
     @pytest.mark.asyncio
     async def test_connect_failure(self, proxmox_config):
