@@ -1,59 +1,50 @@
-Okay, the `PROJECT_INDEX.md` file has been created.
--agent` project aims to provide an automated solution for integrating various data sources (e.g., Proxmox, TrueNAS, Filesystem, Network Scanner) with Netbox. It acts as an agent to discover, synchronize, and monitor infrastructure assets, ensuring that Netbox contains up-to-date information about the environment. This facilitates centralized management and accurate inventory for network and infrastructure components.
+Okay, I have created the `PROJECT_INDEX.md` file.
+7
+
+## Purpose
+The `netbox-agent` project is designed to integrate various infrastructure data sources (such as Proxmox, TrueNAS, Home Assistant, and network scanners) with a Netbox instance. It collects data from these systems, processes it, and synchronizes it with Netbox, potentially orchestrated by a Master Control Program (MCP) server, to maintain an up-to-date and centralized inventory of infrastructure assets.
 
 ## Architecture
-The project is structured around several key modules that handle data acquisition, processing, and synchronization with Netbox:
--   **`src/netbox_agent.py`**: The main entry point for the agent, coordinating the overall workflow.
--   **`src/data_sources/`**: Contains modules for integrating with various data sources (e.g., `proxmox.py`, `truenas.py`, `network_scanner.py`, `filesystem.py`, `home_assistant.py`). These modules are responsible for collecting raw data about devices and infrastructure.
--   **`src/mcp/`**: (Master Control Program) Likely handles communication with central management platforms or provides a unified interface for data sources, mirroring the data source structure (`proxmox.py`, `truenas.py`, etc.).
--   **`src/netbox/`**: Manages interaction with the Netbox API, including client setup (`client.py`), data modeling (`models.py`), and synchronization logic (`sync.py`) to push discovered data into Netbox.
--   **`src/scheduler/`**: Implements the scheduling mechanism (`scheduler.py`) for periodically running data collection and synchronization tasks.
--   **`src/utils/`**: Provides common utility functions such as caching, configuration loading, error handling, and logging.
--   **`config/`**: Stores configuration files (`template-netbox-agent.json`, `data-mappings.json`, `mcp-servers.json`, `alerts.json`) that define how the agent operates, connects to external systems, and maps data.
--   **`api/` & `dashboard/`**: Suggests a potential web API and a dashboard for monitoring and managing the agent.
+- **`src/netbox_agent.py`**: The main application entry point, orchestrating the overall agent operations.
+- **`src/netbox/`**: Contains the Netbox API client (`client.py`), data models (`models.py`), and synchronization logic (`sync.py`) for interacting with the Netbox instance.
+- **`src/data_sources/`**: A collection of modules (e.g., `proxmox.py`, `truenas.py`, `network_scanner.py`) responsible for gathering data from different infrastructure systems.
+- **`src/mcp/`**: Modules for managing interactions with MCP servers, which might orchestrate data collection and synchronization across multiple agents.
+- **`src/scheduler/scheduler.py`**: Manages the scheduling and execution of data collection and synchronization tasks.
+- **`src/utils/`**: Provides common utilities such as logging (`logging.py`), configuration loading (`config.py`), and error handling (`error_handling.py`).
+- **`config/`**: Stores various configuration files, including agent settings, data mapping rules, and MCP server configurations.
+- **`api/`**: Likely contains a web API for external interaction or data exposure.
+- **`dashboard/`**: Suggests a web-based user interface for monitoring or controlling the agent.
 
 ## Key Files
--   **`README.md`**: Project overview, setup, and usage instructions.
--   **`requirements.txt`**: Python dependencies for the core agent.
--   **`pytest.ini`**: Configuration for `pytest` framework.
--   **`Dockerfile`**: Defines the Docker image for deploying the agent.
--   **`docker-compose.yml`**: Orchestrates the agent and potentially other services (like Netbox) for local development or deployment.
--   **`template-config.json`**: A template for the main configuration file.
--   **`config/template-netbox-agent.json`**: Core configuration template for the Netbox Agent.
--   **`config/data-mappings.json`**: Defines how data from various sources maps to Netbox models.
--   **`src/netbox_agent.py`**: Main application logic and entry point.
--   **`src/netbox/client.py`**: Handles API communication with Netbox.
--   **`src/netbox/sync.py`**: Contains the logic for synchronizing discovered data with Netbox.
--   **`src/data_sources/manager.py`**: Manages the different data source implementations.
--   **`scripts/install.sh`**: Script for installing the agent.
--   **`scripts/run-agent.sh`**: Script to run the Netbox Agent.
--   **`scripts/health_check.py`**: Script to perform health checks.
--   **`tests/`**: Directory containing unit and integration tests.
--   **`api/package.json`**: Node.js dependencies for the API.
--   **`dashboard/package.json`**: Node.js dependencies for the dashboard.
+- `README.md`: Project overview and getting started guide.
+- `requirements.txt`: Python dependencies for the agent.
+- `Dockerfile`: Defines the Docker image for the agent.
+- `docker-compose.yml`: Orchestrates the agent and its dependencies using Docker Compose.
+- `pytest.ini`: Pytest configuration file.
+- `src/netbox_agent.py`: Main Python application logic.
+- `src/netbox/client.py`: Netbox API client implementation.
+- `src/data_sources/manager.py`: Manages various data source integrations.
+- `src/mcp/manager.py`: Manages MCP server interactions.
+- `config/template-netbox-agent.json`: Template for the main agent configuration.
+- `config/data-mappings.json`: Defines how collected data maps to Netbox models.
+- `scripts/install.sh`: Installation script for the agent.
+- `scripts/run-agent.sh`: Script to run the Netbox agent.
+- `deploy-to-remote.sh`: Script for remote deployment.
+- `.github/workflows/ci.yml`: GitHub Actions CI workflow definition.
 
 ## Dependencies
--   **Python**: The core agent is written in Python. Dependencies are managed via `requirements.txt`.
--   **Node.js/npm**: Used for the `api` and `dashboard` components, indicated by `package.json` files in those directories.
--   **Docker**: Used for containerization and deployment.
+- **Python (Runtime)**: Dependencies are listed in `requirements.txt`.
+- **Node.js/npm (API & Dashboard)**: Dependencies for the `api/` and `dashboard/` components are specified in their respective `package.json` files.
+- **Docker/Docker Compose**: Used for containerization and orchestration as defined in `Dockerfile` and `docker-compose.yml`.
 
 ## Common Tasks
--   **Install Dependencies**:
-    -   Python: `pip install -r requirements.txt`
-    -   Node.js (for api/dashboard): `npm install` in `api/` and `dashboard/` directories.
--   **Run the Agent**:
-    -   `python src/netbox_agent.py` or `./scripts/run-agent.sh`
--   **Build Docker Image**:
-    -   `docker build -t netbox-agent .`
--   **Run with Docker Compose**:
-    -   `docker-compose up`
--   **Test**:
-    -   `pytest` (assuming `pytest` is installed and configured via `pytest.ini`)
-    -   Specific test files can be run, e.g., `pytest tests/test_netbox_agent.py`
--   **Deployment**:
-    -   `./deploy-to-remote.sh` (shell script for remote deployment)
-    -   Refer to `DEPLOYMENT_MANUAL.md` for detailed deployment instructions.
--   **Configuration Validation**:
-    -   `./scripts/validate-config.sh`
-    -   `python scripts/validate-config.py`
-I have generated the `PROJECT_INDEX.md` file.
+- **Build/Setup**:
+  - `scripts/install.sh`: Run to install necessary components.
+  - `docker-compose build`: Build Docker images.
+- **Test**:
+  - `pytest`: Run all Python tests (configured via `pytest.ini`).
+  - Refer to `.github/workflows/ci.yml` for CI test commands.
+- **Run/Deploy**:
+  - `scripts/run-agent.sh`: Execute the Netbox agent directly.
+  - `docker-compose up`: Start the agent and its services using Docker Compose.
+  - `deploy-to-remote.sh`: Script for deploying the agent to a remote environment.
